@@ -1,4 +1,6 @@
 import { Context, Markup } from 'telegraf'
+import * as dotenv from 'dotenv'
+dotenv.config()
 import { userMenu, adminMenu } from '../menus'
 import { saveUser, isAdmin } from '../services/supabase'
 import type { TimTourBot } from '../types'
@@ -35,7 +37,8 @@ export async function handleDeepLink(
   ctx: Context,
   startPayload: string,
 ) {
-  const TMA_URL = process.env.TMA_URL!
+  const TMA_URL = process.env.TMA_URL || 
+    'https://timtour-tma.vercel.app'
 
   if (startPayload.startsWith('tour_')) {
     const tourId = startPayload.replace('tour_', '')

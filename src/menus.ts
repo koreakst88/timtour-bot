@@ -1,6 +1,9 @@
 import { Markup } from 'telegraf'
+import * as dotenv from 'dotenv'
+dotenv.config()
 
-const TMA_URL = process.env.TMA_URL!
+const TMA_URL = process.env.TMA_URL || 
+  'https://timtour-tma.vercel.app'
 
 export const userMenu = Markup.inlineKeyboard([
   [Markup.button.webApp('🗺️ Каталог туров', `${TMA_URL}/client`)],
