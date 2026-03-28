@@ -33,27 +33,6 @@ bot.use(async (ctx, next) => {
   return next()
 })
 
-bot.action('menu:favorites', async (ctx) => {
-  await ctx.answerCbQuery()
-  const menu = (await isAdmin(ctx.from?.id?.toString() ?? '')) ? adminMenu : userMenu
-  await ctx.reply('Open TimTour and check your favorites there.', menu)
-})
-
-bot.action('menu:bookings', async (ctx) => {
-  await ctx.answerCbQuery()
-  const menu = (await isAdmin(ctx.from?.id?.toString() ?? '')) ? adminMenu : userMenu
-  await ctx.reply('Open TimTour and review your bookings in the mini app.', menu)
-})
-
-bot.action('menu:manager', async (ctx) => {
-  await ctx.answerCbQuery()
-  await ctx.reply('A TimTour manager will contact you shortly.')
-  await notifyAdmin(
-    bot,
-    `<b>Manager request</b>\nUser requested contact: <code>${ctx.from?.id ?? 'unknown'}</code>`,
-  )
-})
-
 bot.on('text', async (ctx) => {
   const menu = (await isAdmin(ctx.from?.id?.toString() ?? '')) ? adminMenu : userMenu
   await ctx.reply('Use /start to open the menu or /admin if you are a manager.', menu)

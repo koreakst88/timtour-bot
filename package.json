@@ -16,7 +16,7 @@
   },
   "scripts": {
     "start": "ts-node src/bot.ts",
-    "dev": "ts-node --watch src/bot.ts",
+    "dev": "ts-node src/bot.ts",
     "build": "tsc"
   }
 }

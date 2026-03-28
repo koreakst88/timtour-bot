@@ -1,6 +1,6 @@
-import type { Context } from 'telegraf'
+import { Context } from 'telegraf'
 import { adminMenu } from '../menus'
-import { getBotUsersCount, isAdmin } from '../services/supabase'
+import { getAllUsers, isAdmin } from '../services/supabase'
 import type { TimTourBot } from '../types'
 
 async function ensureAdmin(ctx: Context) {
@@ -8,6 +8,19 @@ async function ensureAdmin(ctx: Context) {
   if (!tgId) return false
 
   return isAdmin(tgId)
+}
+
+export async function handleStats(ctx: Context) {
+  const users = await getAllUsers()
+
+  await ctx.reply(`
+📊 Статистика TimTour
+
+👥 Пользователей бота: ${users.length}
+📋 Данные о заявках — смотри в панели управления
+
+⚙️ Управление через панель администратора
+  `)
 }
 
 export function registerAdminHandlers(bot: TimTourBot) {
@@ -26,35 +39,7 @@ export function registerAdminHandlers(bot: TimTourBot) {
       return
     }
 
-    const usersCount = await getBotUsersCount()
-    await ctx.reply(
-      [
-        '<b>TimTour bot stats</b>',
-        `Users: <b>${usersCount}</b>`,
-      ].join('\n'),
-      { parse_mode: 'HTML' },
-    )
-  })
-
-  bot.action('admin:stats', async (ctx) => {
-    if (!(await ensureAdmin(ctx))) {
-      await ctx.answerCbQuery('Admin only')
-      return
-    }
-
-    const usersCount = await getBotUsersCount()
-    await ctx.answerCbQuery('Loaded')
-    await ctx.reply(`Users in bot_users: ${usersCount}`)
-  })
-
-  bot.action('admin:broadcast-help', async (ctx) => {
-    if (!(await ensureAdmin(ctx))) {
-      await ctx.answerCbQuery('Admin only')
-      return
-    }
-
-    await ctx.answerCbQuery('Loaded')
-    await ctx.reply('Use /broadcast Your message to send a broadcast to all bot users.')
+    await handleStats(ctx)
   })
 
   bot.action('broadcast', async (ctx) => {
@@ -64,6 +49,6 @@ export function registerAdminHandlers(bot: TimTourBot) {
     }
 
     await ctx.answerCbQuery('Loaded')
-    await ctx.reply('Use /broadcast Your message to start a broadcast.')
+    await ctx.reply('Используйте /broadcast Ваш текст для запуска рассылки.')
   })
 }

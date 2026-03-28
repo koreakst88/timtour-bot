@@ -6,7 +6,6 @@ const menus_1 = require("./menus");
 const admin_1 = require("./handlers/admin");
 const broadcast_1 = require("./handlers/broadcast");
 const start_1 = require("./handlers/start");
-const notifications_1 = require("./services/notifications");
 const supabase_1 = require("./services/supabase");
 const bot = new telegraf_1.Telegraf(process.env.BOT_TOKEN);
 (0, start_1.registerStartHandler)(bot);
@@ -29,21 +28,6 @@ bot.use(async (ctx, next) => {
         }
     }
     return next();
-});
-bot.action('menu:favorites', async (ctx) => {
-    await ctx.answerCbQuery();
-    const menu = (await (0, supabase_1.isAdmin)(ctx.from?.id?.toString() ?? '')) ? menus_1.adminMenu : menus_1.userMenu;
-    await ctx.reply('Open TimTour and check your favorites there.', menu);
-});
-bot.action('menu:bookings', async (ctx) => {
-    await ctx.answerCbQuery();
-    const menu = (await (0, supabase_1.isAdmin)(ctx.from?.id?.toString() ?? '')) ? menus_1.adminMenu : menus_1.userMenu;
-    await ctx.reply('Open TimTour and review your bookings in the mini app.', menu);
-});
-bot.action('menu:manager', async (ctx) => {
-    await ctx.answerCbQuery();
-    await ctx.reply('A TimTour manager will contact you shortly.');
-    await (0, notifications_1.notifyAdmin)(bot, `<b>Manager request</b>\nUser requested contact: <code>${ctx.from?.id ?? 'unknown'}</code>`);
 });
 bot.on('text', async (ctx) => {
     const menu = (await (0, supabase_1.isAdmin)(ctx.from?.id?.toString() ?? '')) ? menus_1.adminMenu : menus_1.userMenu;
