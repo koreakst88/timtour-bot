@@ -1,10 +1,10 @@
 import type { Context } from 'telegraf'
 import type { BroadcastResult, TimTourBot } from '../types'
-import { env, getBotUsers } from './supabase'
+import { getAllUsers } from './supabase'
 
 export async function notifyAdmin(bot: TimTourBot, message: string) {
   try {
-    await bot.telegram.sendMessage(env.ADMIN_TG_ID, message, {
+    await bot.telegram.sendMessage(process.env.ADMIN_TG_ID!, message, {
       parse_mode: 'HTML',
       link_preview_options: { is_disabled: true },
     })
@@ -23,7 +23,7 @@ export async function notifyUser(ctx: Context, message: string) {
 }
 
 export async function broadcastMessage(bot: TimTourBot, message: string): Promise<BroadcastResult> {
-  const users = await getBotUsers()
+  const users = await getAllUsers()
   let delivered = 0
   let failed = 0
 

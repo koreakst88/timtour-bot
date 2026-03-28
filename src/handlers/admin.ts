@@ -17,7 +17,7 @@ export function registerAdminHandlers(bot: TimTourBot) {
       return
     }
 
-    await ctx.reply('TimTour admin menu', adminMenu())
+    await ctx.reply('TimTour admin menu', adminMenu)
   })
 
   bot.command('stats', async (ctx) => {
@@ -55,5 +55,15 @@ export function registerAdminHandlers(bot: TimTourBot) {
 
     await ctx.answerCbQuery('Loaded')
     await ctx.reply('Use /broadcast Your message to send a broadcast to all bot users.')
+  })
+
+  bot.action('broadcast', async (ctx) => {
+    if (!(await ensureAdmin(ctx))) {
+      await ctx.answerCbQuery('Admin only')
+      return
+    }
+
+    await ctx.answerCbQuery('Loaded')
+    await ctx.reply('Use /broadcast Your message to start a broadcast.')
   })
 }

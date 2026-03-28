@@ -15,7 +15,7 @@ function registerAdminHandlers(bot) {
             await ctx.reply('Admin access required.');
             return;
         }
-        await ctx.reply('TimTour admin menu', (0, menus_1.adminMenu)());
+        await ctx.reply('TimTour admin menu', menus_1.adminMenu);
     });
     bot.command('stats', async (ctx) => {
         if (!(await ensureAdmin(ctx))) {
@@ -44,5 +44,13 @@ function registerAdminHandlers(bot) {
         }
         await ctx.answerCbQuery('Loaded');
         await ctx.reply('Use /broadcast Your message to send a broadcast to all bot users.');
+    });
+    bot.action('broadcast', async (ctx) => {
+        if (!(await ensureAdmin(ctx))) {
+            await ctx.answerCbQuery('Admin only');
+            return;
+        }
+        await ctx.answerCbQuery('Loaded');
+        await ctx.reply('Use /broadcast Your message to start a broadcast.');
     });
 }

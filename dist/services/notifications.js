@@ -6,7 +6,7 @@ exports.broadcastMessage = broadcastMessage;
 const supabase_1 = require("./supabase");
 async function notifyAdmin(bot, message) {
     try {
-        await bot.telegram.sendMessage(supabase_1.env.ADMIN_TG_ID, message, {
+        await bot.telegram.sendMessage(process.env.ADMIN_TG_ID, message, {
             parse_mode: 'HTML',
             link_preview_options: { is_disabled: true },
         });
@@ -24,7 +24,7 @@ async function notifyUser(ctx, message) {
     });
 }
 async function broadcastMessage(bot, message) {
-    const users = await (0, supabase_1.getBotUsers)();
+    const users = await (0, supabase_1.getAllUsers)();
     let delivered = 0;
     let failed = 0;
     for (const user of users) {

@@ -1,7 +1,7 @@
 import type { Context } from 'telegraf'
-import { mainMenu } from '../menus'
+import { adminMenu, userMenu } from '../menus'
 import { notifyAdmin } from '../services/notifications'
-import { upsertBotUser } from '../services/supabase'
+import { isAdmin, saveUser } from '../services/supabase'
 import type { TimTourBot } from '../types'
 
 export function registerStartHandler(bot: TimTourBot) {
@@ -14,7 +14,7 @@ export function registerStartHandler(bot: TimTourBot) {
     }
 
     try {
-      await upsertBotUser({
+      await saveUser({
         tg_id: telegramUser.id.toString(),
         first_name: telegramUser.first_name,
         last_name: telegramUser.last_name,
@@ -24,6 +24,8 @@ export function registerStartHandler(bot: TimTourBot) {
       console.error('Failed to save bot user', error)
     }
 
+    const menu = (await isAdmin(telegramUser.id.toString())) ? adminMenu : userMenu
+
     await ctx.reply(
       [
         `Welcome to <b>TimTour</b>, ${telegramUser.first_name}!`,
@@ -31,7 +33,7 @@ export function registerStartHandler(bot: TimTourBot) {
         'Open the mini app, manage favorites, and stay close to new tours.',
       ].join('\n'),
       {
-        ...mainMenu(),
+        ...menu,
         parse_mode: 'HTML',
       },
     )

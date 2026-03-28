@@ -12,7 +12,7 @@ function registerStartHandler(bot) {
             return;
         }
         try {
-            await (0, supabase_1.upsertBotUser)({
+            await (0, supabase_1.saveUser)({
                 tg_id: telegramUser.id.toString(),
                 first_name: telegramUser.first_name,
                 last_name: telegramUser.last_name,
@@ -22,12 +22,13 @@ function registerStartHandler(bot) {
         catch (error) {
             console.error('Failed to save bot user', error);
         }
+        const menu = (await (0, supabase_1.isAdmin)(telegramUser.id.toString())) ? menus_1.adminMenu : menus_1.userMenu;
         await ctx.reply([
             `Welcome to <b>TimTour</b>, ${telegramUser.first_name}!`,
             '',
             'Open the mini app, manage favorites, and stay close to new tours.',
         ].join('\n'), {
-            ...(0, menus_1.mainMenu)(),
+            ...menu,
             parse_mode: 'HTML',
         });
         await (0, notifications_1.notifyAdmin)(bot, [

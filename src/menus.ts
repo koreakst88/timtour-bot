@@ -1,20 +1,15 @@
 import { Markup } from 'telegraf'
-import { env } from './services/supabase'
 
-export function mainMenu() {
-  return Markup.inlineKeyboard([
-    [Markup.button.webApp('Open TimTour', env.TMA_URL)],
-    [
-      Markup.button.callback('Favorites', 'menu:favorites'),
-      Markup.button.callback('Bookings', 'menu:bookings'),
-    ],
-    [Markup.button.callback('Contact manager', 'menu:manager')],
-  ])
-}
+const TMA_URL = process.env.TMA_URL!
 
-export function adminMenu() {
-  return Markup.inlineKeyboard([
-    [Markup.button.callback('Stats', 'admin:stats')],
-    [Markup.button.callback('Broadcast help', 'admin:broadcast-help')],
-  ])
-}
+export const userMenu = Markup.inlineKeyboard([
+  [Markup.button.webApp('🗺️ Каталог туров', `${TMA_URL}/client`)],
+  [Markup.button.webApp('📋 Мои заявки', `${TMA_URL}/bookings`)],
+  [Markup.button.url('💬 Связаться с менеджером', 'https://t.me/TimTour_WW')],
+])
+
+export const adminMenu = Markup.inlineKeyboard([
+  [Markup.button.webApp('🗺️ Открыть каталог', `${TMA_URL}/client`)],
+  [Markup.button.webApp('⚙️ Панель управления', `${TMA_URL}/admin`)],
+  [Markup.button.callback('📢 Рассылка', 'broadcast')],
+])
