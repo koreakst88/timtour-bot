@@ -196,14 +196,20 @@ cron.schedule('0 10 * * *', async () => {
   }
 })
 
-async function configureCommands() {
+async function setupCommands() {
   try {
-    await bot.telegram.setMyCommands([
-      { command: 'start', description: '🏠 Главное меню' },
-      { command: 'catalog', description: '🗺️ Каталог туров' },
-      { command: 'bookings', description: '📋 Мои заявки' },
-      { command: 'help', description: '❓ Помощь' },
-    ])
+    await bot.telegram.setMyCommands(
+      [
+        { command: 'start', description: '🏠 Главное меню' },
+        { command: 'catalog', description: '🗺️ Каталог туров' },
+        { command: 'bookings', description: '📋 Мои заявки' },
+        { command: 'help', description: '❓ Помощь' },
+      ],
+      {
+        scope: { type: 'all_private_chats' },
+      },
+    )
+    console.log('User commands set ✅')
 
     const adminTgId = process.env.ADMIN_TG_ID
 
@@ -224,16 +230,20 @@ async function configureCommands() {
           },
         },
       )
+      console.log('Admin commands set ✅')
     }
   } catch (error) {
-    console.error('Failed to configure bot commands', error)
+    console.error('Commands error:', error)
   }
 }
 
 async function main() {
-  await bot.launch()
+  console.log('TimTour bot starting... 🚀')
+
+  await setupCommands()
+
+  bot.launch()
   console.log('TimTour bot started! 🚀')
-  await configureCommands()
 }
 
 main().catch((error) => {
