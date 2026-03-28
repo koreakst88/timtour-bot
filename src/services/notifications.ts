@@ -1,44 +1,52 @@
-import type { Context } from 'telegraf'
-import type { BroadcastResult, TimTourBot } from '../types'
-import { getAllUsers } from './supabase'
+import { Telegraf } from 'telegraf'
+import { supabase } from './supabase'
 
-export async function notifyAdmin(bot: TimTourBot, message: string) {
+// Keeps the initialized client referenced in this module for future notification-related queries.
+void supabase
+
+export async function sendNotification(
+  bot: Telegraf,
+  tgId: string,
+  message: string,
+) {
   try {
-    await bot.telegram.sendMessage(process.env.ADMIN_TG_ID!, message, {
-      parse_mode: 'HTML',
-      link_preview_options: { is_disabled: true },
-    })
+    await bot.telegram.sendMessage(tgId, message)
   } catch (error) {
-    console.error('Failed to notify admin', error)
+    console.error('Notification error:', error)
   }
 }
 
-export async function notifyUser(ctx: Context, message: string) {
-  if (!ctx.chat?.id) return
+export async function notifyBookingConfirmed(
+  bot: Telegraf,
+  tgId: string,
+  userName: string,
+  tourTitle: string,
+  travelDate: string,
+) {
+  const message = `
+✅ ${userName}, ваша заявка подтверждена!
 
-  await ctx.telegram.sendMessage(ctx.chat.id, message, {
-    parse_mode: 'HTML',
-    link_preview_options: { is_disabled: true },
-  })
+✈️ Тур: ${tourTitle}
+📅 Дата: ${travelDate}
+
+Менеджер свяжется с вами для уточнения деталей.
+По вопросам: @TimTour_WW
+  `
+
+  await sendNotification(bot, tgId, message)
 }
 
-export async function broadcastMessage(bot: TimTourBot, message: string): Promise<BroadcastResult> {
-  const users = await getAllUsers()
-  let delivered = 0
-  let failed = 0
+export async function notifyBookingRejected(
+  bot: Telegraf,
+  tgId: string,
+  userName: string,
+) {
+  const message = `
+❌ ${userName}, к сожалению тур недоступен.
 
-  for (const user of users) {
-    try {
-      await bot.telegram.sendMessage(user.tg_id, message, {
-        parse_mode: 'HTML',
-        link_preview_options: { is_disabled: true },
-      })
-      delivered += 1
-    } catch (error) {
-      failed += 1
-      console.error(`Failed to deliver broadcast to ${user.tg_id}`, error)
-    }
-  }
+Мы предложим вам альтернативный вариант.
+Свяжитесь с менеджером: @TimTour_WW
+  `
 
-  return { delivered, failed }
+  await sendNotification(bot, tgId, message)
 }

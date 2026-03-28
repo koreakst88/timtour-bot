@@ -1,44 +1,37 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.notifyAdmin = notifyAdmin;
-exports.notifyUser = notifyUser;
-exports.broadcastMessage = broadcastMessage;
+exports.sendNotification = sendNotification;
+exports.notifyBookingConfirmed = notifyBookingConfirmed;
+exports.notifyBookingRejected = notifyBookingRejected;
 const supabase_1 = require("./supabase");
-async function notifyAdmin(bot, message) {
+// Keeps the initialized client referenced in this module for future notification-related queries.
+void supabase_1.supabase;
+async function sendNotification(bot, tgId, message) {
     try {
-        await bot.telegram.sendMessage(process.env.ADMIN_TG_ID, message, {
-            parse_mode: 'HTML',
-            link_preview_options: { is_disabled: true },
-        });
+        await bot.telegram.sendMessage(tgId, message);
     }
     catch (error) {
-        console.error('Failed to notify admin', error);
+        console.error('Notification error:', error);
     }
 }
-async function notifyUser(ctx, message) {
-    if (!ctx.chat?.id)
-        return;
-    await ctx.telegram.sendMessage(ctx.chat.id, message, {
-        parse_mode: 'HTML',
-        link_preview_options: { is_disabled: true },
-    });
+async function notifyBookingConfirmed(bot, tgId, userName, tourTitle, travelDate) {
+    const message = `
+✅ ${userName}, ваша заявка подтверждена!
+
+✈️ Тур: ${tourTitle}
+📅 Дата: ${travelDate}
+
+Менеджер свяжется с вами для уточнения деталей.
+По вопросам: @TimTour_WW
+  `;
+    await sendNotification(bot, tgId, message);
 }
-async function broadcastMessage(bot, message) {
-    const users = await (0, supabase_1.getAllUsers)();
-    let delivered = 0;
-    let failed = 0;
-    for (const user of users) {
-        try {
-            await bot.telegram.sendMessage(user.tg_id, message, {
-                parse_mode: 'HTML',
-                link_preview_options: { is_disabled: true },
-            });
-            delivered += 1;
-        }
-        catch (error) {
-            failed += 1;
-            console.error(`Failed to deliver broadcast to ${user.tg_id}`, error);
-        }
-    }
-    return { delivered, failed };
+async function notifyBookingRejected(bot, tgId, userName) {
+    const message = `
+❌ ${userName}, к сожалению тур недоступен.
+
+Мы предложим вам альтернативный вариант.
+Свяжитесь с менеджером: @TimTour_WW
+  `;
+    await sendNotification(bot, tgId, message);
 }
