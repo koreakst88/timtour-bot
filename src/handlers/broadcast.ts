@@ -1,110 +1,184 @@
-import { Context } from 'telegraf'
+import { Context, Markup } from 'telegraf'
 import { getAllUsers, isAdmin } from '../services/supabase'
 import type { TimTourBot } from '../types'
 
-const broadcastState = new Map<string, {
-  step: 'template' | 'text' | 'confirm'
-  template?: string
-  text?: string
-}>()
+type BroadcastStep = 'template' | 'field_1' | 'field_2' | 'field_3' | 'confirm'
+type BroadcastTemplate = 'hot' | 'weekend' | 'new' | 'custom'
 
-const TEMPLATES = {
-  hot: '🔥 Горящий тур\n📍 {направление}\n📅 {даты}\n💰 {цена}\n\n',
-  weekend: '✈️ Тур выходного дня\n📍 {направление}\n\n',
-  new: '🆕 Новый тур\n\n',
+type BroadcastState = {
+  step: BroadcastStep
+  template: BroadcastTemplate
+  fields: Record<string, string>
+}
+
+const broadcastState = new Map<string, BroadcastState>()
+
+const TEMPLATES: Record<BroadcastTemplate, string> = {
+  hot: '🔥 Горящий тур\n📍 {направление}\n📅 {даты}\n💰 {цена}',
+  weekend: '✈️ Тур выходного дня\n📍 {направление}',
+  new: '🆕 Новый тур\n\n{название тура}',
   custom: '',
 }
 
+const FIELD_LABELS: Record<BroadcastTemplate, Array<{ key: string; prompt: string }>> = {
+  hot: [
+    { key: 'направление', prompt: 'Введите направление:' },
+    { key: 'даты', prompt: 'Введите даты:' },
+    { key: 'цена', prompt: 'Введите цену:' },
+  ],
+  weekend: [{ key: 'направление', prompt: 'Введите направление:' }],
+  new: [{ key: 'название тура', prompt: 'Введите название тура:' }],
+  custom: [{ key: 'text', prompt: 'Введите текст рассылки:' }],
+}
+
+function isAdminUser(ctx: Context) {
+  const userId = ctx.from?.id?.toString()
+  return Boolean(userId && isAdmin(userId))
+}
+
+function getState(userId: string) {
+  return broadcastState.get(userId)
+}
+
+function setState(userId: string, state: BroadcastState) {
+  broadcastState.set(userId, state)
+}
+
+function clearState(userId: string) {
+  broadcastState.delete(userId)
+}
+
+function getCurrentFieldIndex(state: BroadcastState) {
+  return state.step === 'field_1' ? 0 : state.step === 'field_2' ? 1 : 2
+}
+
+function getNextStep(step: BroadcastStep) {
+  if (step === 'field_1') return 'field_2'
+  if (step === 'field_2') return 'field_3'
+  return 'confirm'
+}
+
+function buildPreviewText(state: BroadcastState) {
+  if (state.template === 'custom') {
+    return state.fields.text ?? ''
+  }
+
+  return TEMPLATES[state.template]
+    .replace('{направление}', state.fields['направление'] ?? '')
+    .replace('{даты}', state.fields['даты'] ?? '')
+    .replace('{цена}', state.fields['цена'] ?? '')
+    .replace('{название тура}', state.fields['название тура'] ?? '')
+}
+
+function getTemplateKeyboard() {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback('🔥 Горящий тур', 'tmpl_hot')],
+    [Markup.button.callback('✈️ Тур выходного дня', 'tmpl_weekend')],
+    [Markup.button.callback('🆕 Новый тур', 'tmpl_new')],
+    [Markup.button.callback('✏️ Свой текст', 'tmpl_custom')],
+    [Markup.button.callback('❌ Отмена', 'broadcast_cancel')],
+  ])
+}
+
+function getConfirmKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('✅ Отправить', 'broadcast_confirm'),
+      Markup.button.callback('❌ Отмена', 'broadcast_cancel'),
+    ],
+  ])
+}
+
 export function isBroadcastInProgress(userId: string) {
-  const state = broadcastState.get(userId)
-  return state?.step === 'text'
+  const state = getState(userId)
+  return Boolean(state && state.step !== 'template')
 }
 
 export async function handleBroadcast(ctx: Context) {
   const userId = String(ctx.from!.id)
 
-  broadcastState.set(userId, { step: 'template' })
-
-  await ctx.reply(
-    '📢 Выберите шаблон рассылки:',
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '🔥 Горящий тур', callback_data: 'tmpl_hot' }],
-          [{ text: '✈️ Тур выходного дня', callback_data: 'tmpl_weekend' }],
-          [{ text: '🆕 Новый тур', callback_data: 'tmpl_new' }],
-          [{ text: '✏️ Свой текст', callback_data: 'tmpl_custom' }],
-          [{ text: '❌ Отмена', callback_data: 'broadcast_cancel' }],
-        ],
-      },
-    },
-  )
-}
-
-export async function handleTemplateSelect(
-  ctx: Context,
-  template: string,
-) {
-  const userId = String(ctx.from!.id)
-  const templateText = TEMPLATES[template as keyof typeof TEMPLATES]
-
-  broadcastState.set(userId, {
-    step: 'text',
-    template,
-    text: templateText,
+  setState(userId, {
+    step: 'template',
+    template: 'custom',
+    fields: {},
   })
 
-  await ctx.reply(
-    templateText
-      ? `Шаблон выбран! Дополните текст или отправьте как есть:\n\n${templateText}`
-      : 'Напишите текст рассылки:',
-  )
+  await ctx.reply('📢 Выберите шаблон рассылки:', getTemplateKeyboard())
 }
 
-export async function handleBroadcastText(
-  ctx: Context,
-  text: string,
-) {
+export async function handleTemplateSelect(ctx: Context, template: string) {
   const userId = String(ctx.from!.id)
-  const state = broadcastState.get(userId)
+  const selectedTemplate = template as BroadcastTemplate
+  const firstField = FIELD_LABELS[selectedTemplate]?.[0]
 
-  if (!state || state.step !== 'text') return false
+  setState(userId, {
+    step: 'field_1',
+    template: selectedTemplate,
+    fields: {},
+  })
 
-  const finalText = state.text
-    ? state.text + text
-    : text
+  await ctx.reply(firstField?.prompt ?? 'Введите текст рассылки:')
+}
 
-  broadcastState.set(userId, {
+export async function handleBroadcastText(ctx: Context, text: string) {
+  const userId = String(ctx.from!.id)
+  const state = getState(userId)
+
+  if (!state || state.step === 'template' || state.step === 'confirm') return false
+
+  const fieldIndex = getCurrentFieldIndex(state)
+  const fieldConfig = FIELD_LABELS[state.template][fieldIndex]
+
+  if (!fieldConfig) return false
+
+  const nextFields = {
+    ...state.fields,
+    [fieldConfig.key]: text,
+  }
+
+  const hasNextField = fieldIndex + 1 < FIELD_LABELS[state.template].length
+  const nextStep = getNextStep(state.step)
+
+  if (hasNextField) {
+    setState(userId, {
+      ...state,
+      step: nextStep as BroadcastStep,
+      fields: nextFields,
+    })
+
+    await ctx.reply(FIELD_LABELS[state.template][fieldIndex + 1].prompt)
+    return true
+  }
+
+  const finalText = buildPreviewText({
     ...state,
     step: 'confirm',
-    text: finalText,
+    fields: nextFields,
+  })
+
+  setState(userId, {
+    ...state,
+    step: 'confirm',
+    fields: nextFields,
   })
 
   await ctx.reply(
     `📋 Превью рассылки:\n\n${finalText}\n\nОтправить всем пользователям?`,
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '✅ Отправить', callback_data: 'broadcast_confirm' },
-            { text: '❌ Отмена', callback_data: 'broadcast_cancel' },
-          ],
-        ],
-      },
-    },
+    getConfirmKeyboard(),
   )
 
   return true
 }
 
-export async function sendBroadcast(
-  ctx: Context,
-  bot: TimTourBot,
-) {
+export async function sendBroadcast(ctx: Context, bot: TimTourBot) {
   const userId = String(ctx.from!.id)
-  const state = broadcastState.get(userId)
+  const state = getState(userId)
 
-  if (!state?.text) return
+  if (!state) return
+
+  const finalText = buildPreviewText(state)
+
+  if (!finalText) return
 
   const users = await getAllUsers()
   let sent = 0
@@ -114,10 +188,9 @@ export async function sendBroadcast(
 
   for (const user of users) {
     try {
-      await bot.telegram.sendMessage(
-        user.tg_id,
-        state.text,
-      )
+      await bot.telegram.sendMessage(user.tg_id, finalText, {
+        link_preview_options: { is_disabled: true },
+      })
       sent += 1
       await new Promise((resolve) => setTimeout(resolve, 50))
     } catch {
@@ -125,7 +198,7 @@ export async function sendBroadcast(
     }
   }
 
-  broadcastState.delete(userId)
+  clearState(userId)
 
   await ctx.reply(
     `✅ Рассылка завершена!\n\n📤 Отправлено: ${sent}\n❌ Не доставлено: ${failed}`,
@@ -134,7 +207,7 @@ export async function sendBroadcast(
 
 export async function cancelBroadcast(ctx: Context) {
   const userId = String(ctx.from!.id)
-  broadcastState.delete(userId)
+  clearState(userId)
   await ctx.reply('Рассылка отменена.')
 }
 

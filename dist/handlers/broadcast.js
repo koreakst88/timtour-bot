@@ -7,74 +7,143 @@ exports.handleBroadcastText = handleBroadcastText;
 exports.sendBroadcast = sendBroadcast;
 exports.cancelBroadcast = cancelBroadcast;
 exports.registerBroadcastHandlers = registerBroadcastHandlers;
+const telegraf_1 = require("telegraf");
 const supabase_1 = require("../services/supabase");
 const broadcastState = new Map();
 const TEMPLATES = {
-    hot: '🔥 Горящий тур\n📍 {направление}\n📅 {даты}\n💰 {цена}\n\n',
-    weekend: '✈️ Тур выходного дня\n📍 {направление}\n\n',
-    new: '🆕 Новый тур\n\n',
+    hot: '🔥 Горящий тур\n📍 {направление}\n📅 {даты}\n💰 {цена}',
+    weekend: '✈️ Тур выходного дня\n📍 {направление}',
+    new: '🆕 Новый тур\n\n{название тура}',
     custom: '',
 };
+const FIELD_LABELS = {
+    hot: [
+        { key: 'направление', prompt: 'Введите направление:' },
+        { key: 'даты', prompt: 'Введите даты:' },
+        { key: 'цена', prompt: 'Введите цену:' },
+    ],
+    weekend: [{ key: 'направление', prompt: 'Введите направление:' }],
+    new: [{ key: 'название тура', prompt: 'Введите название тура:' }],
+    custom: [{ key: 'text', prompt: 'Введите текст рассылки:' }],
+};
+function isAdminUser(ctx) {
+    const userId = ctx.from?.id?.toString();
+    return Boolean(userId && (0, supabase_1.isAdmin)(userId));
+}
+function getState(userId) {
+    return broadcastState.get(userId);
+}
+function setState(userId, state) {
+    broadcastState.set(userId, state);
+}
+function clearState(userId) {
+    broadcastState.delete(userId);
+}
+function getCurrentFieldIndex(state) {
+    return state.step === 'field_1' ? 0 : state.step === 'field_2' ? 1 : 2;
+}
+function getNextStep(step) {
+    if (step === 'field_1')
+        return 'field_2';
+    if (step === 'field_2')
+        return 'field_3';
+    return 'confirm';
+}
+function buildPreviewText(state) {
+    if (state.template === 'custom') {
+        return state.fields.text ?? '';
+    }
+    return TEMPLATES[state.template]
+        .replace('{направление}', state.fields['направление'] ?? '')
+        .replace('{даты}', state.fields['даты'] ?? '')
+        .replace('{цена}', state.fields['цена'] ?? '')
+        .replace('{название тура}', state.fields['название тура'] ?? '');
+}
+function getTemplateKeyboard() {
+    return telegraf_1.Markup.inlineKeyboard([
+        [telegraf_1.Markup.button.callback('🔥 Горящий тур', 'tmpl_hot')],
+        [telegraf_1.Markup.button.callback('✈️ Тур выходного дня', 'tmpl_weekend')],
+        [telegraf_1.Markup.button.callback('🆕 Новый тур', 'tmpl_new')],
+        [telegraf_1.Markup.button.callback('✏️ Свой текст', 'tmpl_custom')],
+        [telegraf_1.Markup.button.callback('❌ Отмена', 'broadcast_cancel')],
+    ]);
+}
+function getConfirmKeyboard() {
+    return telegraf_1.Markup.inlineKeyboard([
+        [
+            telegraf_1.Markup.button.callback('✅ Отправить', 'broadcast_confirm'),
+            telegraf_1.Markup.button.callback('❌ Отмена', 'broadcast_cancel'),
+        ],
+    ]);
+}
 function isBroadcastInProgress(userId) {
-    const state = broadcastState.get(userId);
-    return state?.step === 'text';
+    const state = getState(userId);
+    return Boolean(state && state.step !== 'template');
 }
 async function handleBroadcast(ctx) {
     const userId = String(ctx.from.id);
-    broadcastState.set(userId, { step: 'template' });
-    await ctx.reply('📢 Выберите шаблон рассылки:', {
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: '🔥 Горящий тур', callback_data: 'tmpl_hot' }],
-                [{ text: '✈️ Тур выходного дня', callback_data: 'tmpl_weekend' }],
-                [{ text: '🆕 Новый тур', callback_data: 'tmpl_new' }],
-                [{ text: '✏️ Свой текст', callback_data: 'tmpl_custom' }],
-                [{ text: '❌ Отмена', callback_data: 'broadcast_cancel' }],
-            ],
-        },
+    setState(userId, {
+        step: 'template',
+        template: 'custom',
+        fields: {},
     });
+    await ctx.reply('📢 Выберите шаблон рассылки:', getTemplateKeyboard());
 }
 async function handleTemplateSelect(ctx, template) {
     const userId = String(ctx.from.id);
-    const templateText = TEMPLATES[template];
-    broadcastState.set(userId, {
-        step: 'text',
-        template,
-        text: templateText,
+    const selectedTemplate = template;
+    const firstField = FIELD_LABELS[selectedTemplate]?.[0];
+    setState(userId, {
+        step: 'field_1',
+        template: selectedTemplate,
+        fields: {},
     });
-    await ctx.reply(templateText
-        ? `Шаблон выбран! Дополните текст или отправьте как есть:\n\n${templateText}`
-        : 'Напишите текст рассылки:');
+    await ctx.reply(firstField?.prompt ?? 'Введите текст рассылки:');
 }
 async function handleBroadcastText(ctx, text) {
     const userId = String(ctx.from.id);
-    const state = broadcastState.get(userId);
-    if (!state || state.step !== 'text')
+    const state = getState(userId);
+    if (!state || state.step === 'template' || state.step === 'confirm')
         return false;
-    const finalText = state.text
-        ? state.text + text
-        : text;
-    broadcastState.set(userId, {
+    const fieldIndex = getCurrentFieldIndex(state);
+    const fieldConfig = FIELD_LABELS[state.template][fieldIndex];
+    if (!fieldConfig)
+        return false;
+    const nextFields = {
+        ...state.fields,
+        [fieldConfig.key]: text,
+    };
+    const hasNextField = fieldIndex + 1 < FIELD_LABELS[state.template].length;
+    const nextStep = getNextStep(state.step);
+    if (hasNextField) {
+        setState(userId, {
+            ...state,
+            step: nextStep,
+            fields: nextFields,
+        });
+        await ctx.reply(FIELD_LABELS[state.template][fieldIndex + 1].prompt);
+        return true;
+    }
+    const finalText = buildPreviewText({
         ...state,
         step: 'confirm',
-        text: finalText,
+        fields: nextFields,
     });
-    await ctx.reply(`📋 Превью рассылки:\n\n${finalText}\n\nОтправить всем пользователям?`, {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    { text: '✅ Отправить', callback_data: 'broadcast_confirm' },
-                    { text: '❌ Отмена', callback_data: 'broadcast_cancel' },
-                ],
-            ],
-        },
+    setState(userId, {
+        ...state,
+        step: 'confirm',
+        fields: nextFields,
     });
+    await ctx.reply(`📋 Превью рассылки:\n\n${finalText}\n\nОтправить всем пользователям?`, getConfirmKeyboard());
     return true;
 }
 async function sendBroadcast(ctx, bot) {
     const userId = String(ctx.from.id);
-    const state = broadcastState.get(userId);
-    if (!state?.text)
+    const state = getState(userId);
+    if (!state)
+        return;
+    const finalText = buildPreviewText(state);
+    if (!finalText)
         return;
     const users = await (0, supabase_1.getAllUsers)();
     let sent = 0;
@@ -82,7 +151,9 @@ async function sendBroadcast(ctx, bot) {
     await ctx.reply('📤 Отправляю рассылку...');
     for (const user of users) {
         try {
-            await bot.telegram.sendMessage(user.tg_id, state.text);
+            await bot.telegram.sendMessage(user.tg_id, finalText, {
+                link_preview_options: { is_disabled: true },
+            });
             sent += 1;
             await new Promise((resolve) => setTimeout(resolve, 50));
         }
@@ -90,12 +161,12 @@ async function sendBroadcast(ctx, bot) {
             failed += 1;
         }
     }
-    broadcastState.delete(userId);
+    clearState(userId);
     await ctx.reply(`✅ Рассылка завершена!\n\n📤 Отправлено: ${sent}\n❌ Не доставлено: ${failed}`);
 }
 async function cancelBroadcast(ctx) {
     const userId = String(ctx.from.id);
-    broadcastState.delete(userId);
+    clearState(userId);
     await ctx.reply('Рассылка отменена.');
 }
 function registerBroadcastHandlers(bot) {
