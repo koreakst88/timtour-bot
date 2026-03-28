@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleStats = handleStats;
 exports.registerAdminHandlers = registerAdminHandlers;
 const menus_1 = require("../menus");
+const broadcast_1 = require("./broadcast");
 const supabase_1 = require("../services/supabase");
 async function ensureAdmin(ctx) {
     const tgId = ctx.from?.id?.toString();
@@ -42,6 +43,6 @@ function registerAdminHandlers(bot) {
             return;
         }
         await ctx.answerCbQuery('Loaded');
-        await ctx.reply('Используйте /broadcast Ваш текст для запуска рассылки.');
+        await (0, broadcast_1.handleBroadcast)(ctx);
     });
 }

@@ -1,5 +1,6 @@
 import { Context } from 'telegraf'
 import { adminMenu } from '../menus'
+import { handleBroadcast } from './broadcast'
 import { getAllUsers, isAdmin } from '../services/supabase'
 import type { TimTourBot } from '../types'
 
@@ -49,6 +50,6 @@ export function registerAdminHandlers(bot: TimTourBot) {
     }
 
     await ctx.answerCbQuery('Loaded')
-    await ctx.reply('Используйте /broadcast Ваш текст для запуска рассылки.')
+    await handleBroadcast(ctx)
   })
 }

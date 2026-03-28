@@ -2,9 +2,8 @@ import 'dotenv/config'
 import { Telegraf } from 'telegraf'
 import { adminMenu, userMenu } from './menus'
 import { registerAdminHandlers } from './handlers/admin'
-import { registerBroadcastHandlers } from './handlers/broadcast'
+import { handleBroadcastText, isBroadcastInProgress, registerBroadcastHandlers } from './handlers/broadcast'
 import { registerStartHandler } from './handlers/start'
-import { notifyAdmin } from './services/notifications'
 import { isAdmin, saveUser, touchUser } from './services/supabase'
 
 const bot = new Telegraf(process.env.BOT_TOKEN!)
@@ -34,6 +33,13 @@ bot.use(async (ctx, next) => {
 })
 
 bot.on('text', async (ctx) => {
+  const userId = ctx.from?.id?.toString() ?? ''
+
+  if (isBroadcastInProgress(userId)) {
+    const handled = await handleBroadcastText(ctx, ctx.message.text)
+    if (handled) return
+  }
+
   const menu = (await isAdmin(ctx.from?.id?.toString() ?? '')) ? adminMenu : userMenu
   await ctx.reply('Use /start to open the menu or /admin if you are a manager.', menu)
 })

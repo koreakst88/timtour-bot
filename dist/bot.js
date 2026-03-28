@@ -30,6 +30,12 @@ bot.use(async (ctx, next) => {
     return next();
 });
 bot.on('text', async (ctx) => {
+    const userId = ctx.from?.id?.toString() ?? '';
+    if ((0, broadcast_1.isBroadcastInProgress)(userId)) {
+        const handled = await (0, broadcast_1.handleBroadcastText)(ctx, ctx.message.text);
+        if (handled)
+            return;
+    }
     const menu = (await (0, supabase_1.isAdmin)(ctx.from?.id?.toString() ?? '')) ? menus_1.adminMenu : menus_1.userMenu;
     await ctx.reply('Use /start to open the menu or /admin if you are a manager.', menu);
 });
