@@ -45,7 +45,7 @@ bot.start(async (ctx) => {
 bot.command('catalog', async (ctx) => {
   const TMA_URL = process.env.TMA_URL!
   await ctx.reply(
-    '🗺️ Открываю каталог туров...',
+    '🗺️ Нажмите кнопку чтобы открыть каталог:',
     Markup.inlineKeyboard([
       [Markup.button.webApp('🗺️ Каталог туров', `${TMA_URL}/catalog`)],
     ]),
@@ -55,7 +55,7 @@ bot.command('catalog', async (ctx) => {
 bot.command('bookings', async (ctx) => {
   const TMA_URL = process.env.TMA_URL!
   await ctx.reply(
-    '📋 Открываю ваши заявки...',
+    '📋 Нажмите кнопку чтобы открыть заявки:',
     Markup.inlineKeyboard([
       [Markup.button.webApp('📋 Мои заявки', `${TMA_URL}/bookings`)],
     ]),
@@ -78,7 +78,7 @@ bot.command('admin', async (ctx) => {
   if (!(await isAdmin(String(ctx.from.id)))) return
   const TMA_URL = process.env.TMA_URL!
   await ctx.reply(
-    '⚙️ Панель управления',
+    '⚙️ Нажмите кнопку чтобы открыть панель:',
     Markup.inlineKeyboard([
       [Markup.button.webApp('⚙️ Открыть панель', `${TMA_URL}/admin`)],
     ]),
