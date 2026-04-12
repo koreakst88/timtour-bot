@@ -8,7 +8,7 @@ const TMA_URL = process.env.TMA_URL ||
 export const userMenu = Markup.inlineKeyboard([
   [Markup.button.webApp('🗺️ Каталог туров', `${TMA_URL}/client`)],
   [Markup.button.webApp('📋 Мои заявки', `${TMA_URL}/bookings`)],
-  [Markup.button.url('💬 Связаться с менеджером', 'https://t.me/TimTour_WW')],
+  [Markup.button.url('💬 Связаться с менеджером', 'https://t.me/Timofeevna22')],
 ])
 
 export const adminMenu = Markup.inlineKeyboard([
