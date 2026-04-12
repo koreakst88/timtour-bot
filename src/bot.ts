@@ -16,6 +16,115 @@ import { supabase, isAdmin } from './services/supabase'
 dotenv.config()
 
 const bot = new Telegraf(process.env.BOT_TOKEN!)
+const TMA_URL = process.env.TMA_URL!
+
+function extractPostText(post: { text?: string; caption?: string }) {
+  return post.text ?? post.caption ?? ''
+}
+
+function hasTourHashtag(text: string) {
+  return text.includes('#тур') || text.includes('#tour') || text.includes('#timtour')
+}
+
+function getTourButtonsMarkup() {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: '🗺️ Посмотреть тур',
+          web_app: { url: `${TMA_URL}/catalog` },
+        },
+      ],
+      [
+        {
+          text: '✈️ Оставить заявку',
+          web_app: { url: `${TMA_URL}/client` },
+        },
+      ],
+    ],
+  }
+}
+
+async function attachButtonsToChannelPost(ctx: {
+  chat: { id: number | string; type?: string }
+  telegram: Telegraf['telegram']
+}, post: { message_id: number; text?: string; caption?: string }) {
+  const text = extractPostText(post)
+  console.log('[tour-buttons] channel_post received', {
+    chatId: ctx.chat.id,
+    chatType: ctx.chat.type,
+    messageId: post.message_id,
+    hasHashtag: hasTourHashtag(text),
+  })
+
+  if (!hasTourHashtag(text)) return
+
+  try {
+    await ctx.telegram.editMessageReplyMarkup(
+      ctx.chat.id,
+      post.message_id,
+      undefined,
+      getTourButtonsMarkup(),
+    )
+    console.log('[tour-buttons] channel buttons attached ✅', {
+      chatId: ctx.chat.id,
+      messageId: post.message_id,
+    })
+  } catch (error) {
+    console.error('[tour-buttons] channel attach error', {
+      chatId: ctx.chat.id,
+      messageId: post.message_id,
+      error,
+    })
+  }
+}
+
+async function attachButtonsToGroupTopic(ctx: {
+  chat: { id: number | string; type?: string }
+  telegram: Telegraf['telegram']
+}, message: {
+  message_id: number
+  text?: string
+  caption?: string
+  message_thread_id?: number
+}) {
+  const text = extractPostText(message)
+  console.log('[tour-buttons] group message received', {
+    chatId: ctx.chat.id,
+    chatType: ctx.chat.type,
+    messageId: message.message_id,
+    threadId: message.message_thread_id,
+    hasHashtag: hasTourHashtag(text),
+  })
+
+  if (!hasTourHashtag(text)) return
+
+  try {
+    await ctx.telegram.sendMessage(
+      ctx.chat.id,
+      'Открыть туры TimTour:',
+      {
+        message_thread_id: message.message_thread_id,
+        reply_parameters: {
+          message_id: message.message_id,
+        },
+        reply_markup: getTourButtonsMarkup(),
+      },
+    )
+    console.log('[tour-buttons] topic buttons attached ✅', {
+      chatId: ctx.chat.id,
+      messageId: message.message_id,
+      threadId: message.message_thread_id,
+    })
+  } catch (error) {
+    console.error('[tour-buttons] topic attach error', {
+      chatId: ctx.chat.id,
+      messageId: message.message_id,
+      threadId: message.message_thread_id,
+      error,
+    })
+  }
+}
 
 bot.use(async (ctx, next) => {
   if (ctx.from) {
@@ -43,7 +152,6 @@ bot.start(async (ctx) => {
 })
 
 bot.command('catalog', async (ctx) => {
-  const TMA_URL = process.env.TMA_URL!
   await ctx.reply(
     '🗺️ Нажмите кнопку чтобы открыть каталог:',
     Markup.inlineKeyboard([
@@ -53,7 +161,6 @@ bot.command('catalog', async (ctx) => {
 })
 
 bot.command('bookings', async (ctx) => {
-  const TMA_URL = process.env.TMA_URL!
   await ctx.reply(
     '📋 Нажмите кнопку чтобы открыть заявки:',
     Markup.inlineKeyboard([
@@ -76,7 +183,6 @@ bot.command('help', async (ctx) => {
 
 bot.command('admin', async (ctx) => {
   if (!(await isAdmin(String(ctx.from.id)))) return
-  const TMA_URL = process.env.TMA_URL!
   await ctx.reply(
     '⚙️ Нажмите кнопку чтобы открыть панель:',
     Markup.inlineKeyboard([
@@ -129,40 +235,17 @@ bot.on('text', async (ctx) => {
 })
 
 bot.on('channel_post', async (ctx) => {
-  const post = ctx.channelPost
-  const TMA_URL = process.env.TMA_URL!
+  await attachButtonsToChannelPost(ctx, ctx.channelPost)
+})
 
-  if ('text' in post || 'caption' in post) {
-    const text = ('text' in post ? post.text : post.caption) ?? ''
+bot.on('message', async (ctx) => {
+  if (ctx.chat.type !== 'group' && ctx.chat.type !== 'supergroup') return
+  if (ctx.from?.is_bot) return
 
-    if (text.includes('#тур') || text.includes('#tour') || text.includes('#timtour')) {
-      try {
-        await ctx.telegram.editMessageReplyMarkup(
-          ctx.chat.id,
-          post.message_id,
-          undefined,
-          {
-            inline_keyboard: [
-              [
-                {
-                  text: '🗺️ Посмотреть тур',
-                  web_app: { url: `${TMA_URL}/catalog` },
-                },
-              ],
-              [
-                {
-                  text: '✈️ Оставить заявку',
-                  web_app: { url: `${TMA_URL}/client` },
-                },
-              ],
-            ],
-          },
-        )
-      } catch (error) {
-        console.error('Channel post error:', error)
-      }
-    }
-  }
+  const message = ctx.message
+  if (!('text' in message || 'caption' in message)) return
+
+  await attachButtonsToGroupTopic(ctx, message)
 })
 
 cron.schedule('0 10 * * *', async () => {
