@@ -324,6 +324,12 @@ async function main() {
   console.log('TimTour bot starting... 🚀')
 
   await setupCommands()
+  try {
+    await bot.telegram.deleteWebhook({ drop_pending_updates: false })
+    console.log('Webhook cleared ✅')
+  } catch (error) {
+    console.error('Webhook clear error:', error)
+  }
 
   bot.launch()
   console.log('TimTour bot started! 🚀')
