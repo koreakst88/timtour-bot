@@ -32,13 +32,13 @@ function getTourButtonsMarkup() {
       [
         {
           text: '🗺️ Посмотреть тур',
-          web_app: { url: `${TMA_URL}/catalog` },
+          url: `${TMA_URL}/catalog`,
         },
       ],
       [
         {
           text: '✈️ Оставить заявку',
-          web_app: { url: `${TMA_URL}/client` },
+          url: `${TMA_URL}/client`,
         },
       ],
     ],
